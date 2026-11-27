@@ -1,0 +1,4 @@
+# Install with:  .venv\Scripts\python.exe -m pip install -r requirements.txt
+# Qt for Python. Its Qt Multimedia brings its own FFmpeg, so HEVC / H.265 plays without Microsoft's paid codec.
+# (PySide6-Addons pulls in PySide6-Essentials; the big "PySide6" bundle with the web browser isn't needed.)
+PySide6-Addons==6.12.0
