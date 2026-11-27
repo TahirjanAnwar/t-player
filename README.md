@@ -111,3 +111,8 @@ Without Microsoft's HEVC codec, Windows can't show a picture for HEVC videos, so
 
 The video engine is Qt Multimedia with its built-in FFmpeg (LGPL), from
 [Qt for Python](https://doc.qt.io/qtforpython-6/) (PySide6).
+
+## License
+
+T-Player's own code is under the [MIT License](LICENSE). You may use, change and share it, as long as you keep
+the copyright notice. Qt for Python and FFmpeg, which `setup.cmd` installs, keep their own licenses (LGPL).
