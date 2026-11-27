@@ -34,6 +34,18 @@ Windows doesn't let an app make itself the default, so you choose it once:
 Another way: right-click a video › *Open with* › *Choose another app* › T-Player › *Always use this app*.
 To undo the registration: `.venv\Scripts\python.exe tplayer.py --unregister`.
 
+## Thumbnails in File Explorer
+
+Without Microsoft's HEVC codec, Windows can't show a picture for HEVC videos, so they just show the app's icon.
+`--register` also switches on T-Player's own thumbnails:
+
+- **What you see.** Videos that open with T-Player show a frame from about 1 second in as their thumbnail.
+- **How it works.** `TPlayerThumbnails.dll` asks FFmpeg for that frame. It needs FFmpeg
+  (`winget install Gyan.FFmpeg`).
+- **Safety.** Windows runs it in its separate thumbnail process, not inside Explorer, and it only reads the videos.
+- **Speed.** A 4K HEVC clip takes about half a second the first time, then Windows keeps the thumbnail.
+- **Turning it off.** `--unregister` removes it together with the rest.
+
 ## Keyboard
 
 | Key | Does |
@@ -70,8 +82,10 @@ To undo the registration: `.venv\Scripts\python.exe tplayer.py --unregister`.
 | `qml/Main.qml` | The window and its controls |
 | `locales/*.json` | The texts in each language |
 | `launcher/TPlayerLauncher.cs` | Source of `T-Player.exe`, built by `setup.cmd` with Windows' own C# compiler |
+| `launcher/TPlayerThumbnails.cs` | Source of `TPlayerThumbnails.dll`, the File Explorer thumbnails |
 | `assets/` | The icon. `tools/make_icon.py` draws it (needs Pillow) |
 | `tools/check_playback.py` | A test run with real videos: GPU or CPU, frame rate, frame stepping, screenshots |
+| `tools/thumbtest.cs` | A test for the thumbnails: directly, or through Windows once registered |
 
 The video engine is Qt Multimedia with its built-in FFmpeg (LGPL), from
 [Qt for Python](https://doc.qt.io/qtforpython-6/) (PySide6).

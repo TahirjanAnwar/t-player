@@ -23,6 +23,11 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+rem Thumbnails for File Explorer (switched on by "tplayer.py --register"; they need FFmpeg: winget install Gyan.FFmpeg)
+"%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:library /optimize+ /reference:System.Drawing.dll /out:TPlayerThumbnails.dll launcher\TPlayerThumbnails.cs
+if errorlevel 1 (
+  echo Building the thumbnail add-on failed - T-Player still works, but File Explorer won't show video frames.
+)
 set "TP_DIR=%~dp0"
 powershell -NoProfile -Command "$dir = $env:TP_DIR; $shell = New-Object -ComObject WScript.Shell; foreach ($folder in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) { $link = $shell.CreateShortcut((Join-Path $folder 'T-Player.lnk')); $link.TargetPath = (Join-Path $dir 'T-Player.exe'); $link.WorkingDirectory = $dir; $link.Description = 'T-Player video player'; $link.Save() }"
 echo.

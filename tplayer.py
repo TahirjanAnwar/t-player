@@ -11,6 +11,7 @@ import ctypes
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -664,6 +665,10 @@ def build(argv: list[str]):
 
 PROG_ID = "TPlayer.Video"
 CAPABILITIES = r"Software\Clients\Media\T-Player\Capabilities"
+THUMBNAIL_DLL = APP_DIR / "TPlayerThumbnails.dll"
+THUMBNAIL_CLSID = "{5F2722BF-DA9D-4983-AF1D-B5C441DBF04E}"      # TPlayer.ThumbnailProvider in TPlayerThumbnails.cs
+THUMBNAIL_HANDLER = "{e357fccd-a995-4576-b01f-234630154e96}"    # Windows' "thumbnail provider" slot
+APPROVED = r"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved"
 ASSOCIATE_EXTS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".mts", ".m2ts", ".ts", ".mxf", ".3gp",
                   ".mpg", ".mpeg", ".flv", ".hevc", ".h265"]
 
@@ -688,6 +693,26 @@ def registry_entries() -> list[tuple[str, str, str]]:
         entries += [(CAPABILITIES + r"\FileAssociations", ext, PROG_ID),
                     (rf"Software\Classes\{ext}\OpenWithProgids", PROG_ID, ""),
                     (r"Software\Classes\Applications\T-Player.exe\SupportedTypes", ext, "")]
+    return entries
+
+
+def thumbnail_entries(ffmpeg: str) -> list[tuple[str, str, str]]:
+    """Explorer thumbnails for videos that open with T-Player: TPlayerThumbnails.dll, a .NET COM class that
+    Windows runs in its separate thumbnail process."""
+    clsid = rf"Software\Classes\CLSID\{THUMBNAIL_CLSID}"
+    server = {"Class": "TPlayer.ThumbnailProvider",
+              "Assembly": "TPlayerThumbnails, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+              "RuntimeVersion": "v4.0.30319",
+              "CodeBase": "file:///" + str(THUMBNAIL_DLL).replace("\\", "/")}
+    entries = [(clsid, "", "T-Player thumbnails"),
+               (clsid + r"\InprocServer32", "", "mscoree.dll"),
+               (clsid + r"\InprocServer32", "ThreadingModel", "Both")]
+    entries += [(clsid + r"\InprocServer32", name, value) for name, value in server.items()]
+    entries += [(clsid + r"\InprocServer32\1.0.0.0", name, value) for name, value in server.items()]
+    entries += [(clsid + r"\Implemented Categories\{62C8FE65-4EBB-45e7-B440-6E39B2CDBF29}", "", ""),
+                (rf"Software\Classes\{PROG_ID}\ShellEx\{THUMBNAIL_HANDLER}", "", THUMBNAIL_CLSID),
+                (APPROVED, THUMBNAIL_CLSID, "T-Player thumbnails"),
+                (r"Software\T-Player", "FFmpeg", ffmpeg)]
     return entries
 
 
@@ -719,20 +744,32 @@ def register_with_windows(remove: bool = False) -> None:
 
     if remove:
         for path in (rf"Software\Classes\{PROG_ID}", r"Software\Classes\Applications\T-Player.exe",
-                     r"Software\Clients\Media\T-Player"):
+                     r"Software\Clients\Media\T-Player", rf"Software\Classes\CLSID\{THUMBNAIL_CLSID}",
+                     r"Software\T-Player"):
             delete_tree(path)
         delete_value(r"Software\RegisteredApplications", APP_NAME)
+        delete_value(APPROVED, THUMBNAIL_CLSID)
         for ext in ASSOCIATE_EXTS:
             delete_value(rf"Software\Classes\{ext}\OpenWithProgids", PROG_ID)
+        notes = ["T-Player removed from Windows' app lists and thumbnails."]
     else:
         if not (APP_DIR / "T-Player.exe").exists():
             raise SystemExit("T-Player.exe is missing - run setup.cmd first.")
-        for path, name, data in registry_entries():
+        entries = registry_entries()
+        notes = ["T-Player is now listed under Open with and Settings > Apps > Default apps > Video player."]
+        ffmpeg = shutil.which("ffmpeg")
+        if not THUMBNAIL_DLL.exists():
+            notes.append("No thumbnails: TPlayerThumbnails.dll is missing - run setup.cmd first.")
+        elif not ffmpeg:
+            notes.append("No thumbnails: FFmpeg isn't installed (winget install Gyan.FFmpeg), then register again.")
+        else:
+            entries += thumbnail_entries(ffmpeg)
+            notes.append("Videos that open with T-Player now show a frame as their thumbnail in File Explorer.")
+        for path, name, data in entries:
             with winreg.CreateKeyEx(hkcu, path, 0, winreg.KEY_SET_VALUE) as key:
                 winreg.SetValueEx(key, name, 0, winreg.REG_SZ, data)
     ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)   # SHCNE_ASSOCCHANGED: Explorer re-reads
-    print("T-Player removed from Windows' app lists." if remove else
-          "T-Player is now listed under Open with and Settings > Apps > Default apps > Video player.")
+    print("\n".join(notes))
 
 
 def main() -> int:

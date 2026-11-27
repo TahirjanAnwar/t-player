@@ -1,6 +1,7 @@
 # Made on this PC by setup.cmd or while using T-Player
 .venv/
 T-Player.exe
+TPlayerThumbnails.dll
 settings.json
 settings.tmp
 t-player.log
