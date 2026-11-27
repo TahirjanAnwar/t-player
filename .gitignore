@@ -2,6 +2,8 @@
 .venv/
 T-Player.exe
 TPlayerThumbnails.dll
+*.old-*
+build-new/
 settings.json
 settings.tmp
 t-player.log

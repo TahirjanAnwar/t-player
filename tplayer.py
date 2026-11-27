@@ -21,7 +21,7 @@ from pathlib import Path
 
 APP_NAME = "T-Player"
 APP_ID = "TProduction.TPlayer"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 APP_DIR = Path(__file__).resolve().parent
 SETTINGS_PATH = APP_DIR / "settings.json"
 LOG_PATH = APP_DIR / "t-player.log"
@@ -30,7 +30,7 @@ ICON_PATH = APP_DIR / "assets" / "t-player.ico"
 # Qt's own FFmpeg engine, not Windows Media Foundation (which is the one that wants the paid codec).
 os.environ.setdefault("QT_MEDIA_BACKEND", "ffmpeg")
 
-from PySide6.QtCore import (Property, QLocale, QObject, QRect, QStandardPaths, QTimer, QUrl, Signal, Slot,
+from PySide6.QtCore import (Property, QLocale, QObject, QRect, QStandardPaths, Qt, QTimer, QUrl, Signal, Slot,
                             qInstallMessageHandler)
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QGuiApplication, QIcon, QImage, QPalette, QWindow
 from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame, QVideoFrameFormat, QVideoSink
@@ -170,6 +170,82 @@ def pick_language(saved: str, available) -> str:
     return "en"
 
 
+# ---------------------------------------------------------------- updates from GitHub
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / r"Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+# What setup.cmd builds with Windows' C# compiler, and the files that mean it must be built again.
+BUILDS = {
+    "T-Player.exe": ({"launcher/TPlayerLauncher.cs", "assets/t-player.ico"},
+                     ["/target:winexe", r"/win32icon:assets\t-player.ico", "/reference:System.Windows.Forms.dll",
+                      r"launcher\TPlayerLauncher.cs"]),
+    "TPlayerThumbnails.dll": ({"launcher/TPlayerThumbnails.cs"},
+                              ["/target:library", "/reference:System.Drawing.dll", r"launcher\TPlayerThumbnails.cs"]),
+}
+
+
+def run_quiet(args, timeout: int = 120, env=None) -> tuple[int, str, str]:
+    """Runs a program without flashing a console window. Returns (exit code, output, errors)."""
+    try:
+        done = subprocess.run([str(a) for a in args], cwd=str(APP_DIR), capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout, env=env, creationflags=NO_WINDOW)
+        return done.returncode, (done.stdout or "").strip(), (done.stderr or "").strip()
+    except subprocess.TimeoutExpired:
+        return 124, "", "timed out"
+    except OSError as error:
+        return 127, "", str(error)
+
+
+def git(*args, timeout: int = 60) -> tuple[int, str, str]:
+    exe = shutil.which("git")
+    if not exe:
+        return 127, "", "git not found"
+    return run_quiet([exe, *args], timeout=timeout,
+                     env=dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never"))
+
+
+def short(text: str) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= 300 else text[:297] + "..."
+
+
+def version_text() -> str:
+    """"1.1.0 (e210a79 · 2026-11-27)" in a git copy, otherwise just the version."""
+    code, out, _ = git("log", "-1", "--format=%h · %cs") if (APP_DIR / ".git").exists() else (1, "", "")
+    return f"{VERSION} ({out})" if code == 0 and out else VERSION
+
+
+def rebuild(names) -> str:
+    """Builds T-Player.exe / TPlayerThumbnails.dll again. Returns an error text, or "" when it worked.
+    The old file is renamed, not overwritten: Windows may still have it loaded for thumbnails."""
+    staging = APP_DIR / "build-new"
+    shutil.rmtree(staging, ignore_errors=True)
+    try:
+        staging.mkdir()
+        for name in names:
+            code, out, err = run_quiet([CSC, "/nologo", "/optimize+", f"/out:{staging / name}", *BUILDS[name][1]])
+            if code != 0:
+                return short(out or err)
+        for name in names:
+            target = APP_DIR / name
+            if target.exists():
+                target.rename(target.with_name(f"{target.stem}.old-{int(time.time())}{target.suffix}"))
+            (staging / name).rename(target)
+        return ""
+    except OSError as error:
+        return short(str(error))
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def remove_old_builds() -> None:
+    for old in APP_DIR.glob("*.old-*"):
+        try:
+            old.unlink()
+        except OSError:
+            pass   # still loaded by Windows: it goes next time
+
+
 # ---------------------------------------------------------------- the bridge between Python and the QML window
 
 class Backend(QObject):
@@ -177,9 +253,12 @@ class Backend(QObject):
     optionsChanged = Signal()
     recentChanged = Signal()
     currentChanged = Signal()
+    updateChanged = Signal()
+    updateInstalled = Signal()
     openRequested = Signal(str)
     frameSaved = Signal(str)
     frameSaveFailed = Signal()
+    _relay = Signal(object)   # work finished in a background thread, handed to the window's thread
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -191,6 +270,16 @@ class Backend(QObject):
         self._uyghur_font = next((f for f in UYGHUR_FONTS if f in families), "")
         self._current = ""
         self._playlist: list[str] = []
+        self._version_text = version_text()
+        self._update = {"state": "idle", "key": "", "args": {}, "changes": []}
+        self._relay.connect(self._run_relayed, Qt.ConnectionType.QueuedConnection)
+
+    def _run_relayed(self, job):
+        job()
+
+    def _later(self, job):
+        """Runs job() on the window's thread. QML must never be touched from a background thread."""
+        self._relay.emit(job)
 
     # ---- language
     def _merged_strings(self) -> dict:
@@ -211,6 +300,7 @@ class Backend(QObject):
             self._strings = self._merged_strings()
             self._settings.set("language", code)
             self.languageChanged.emit()
+            self.updateChanged.emit()   # the update message is shown in the new language too
 
     @Property("QVariantList", constant=True)
     def languages(self):
@@ -272,6 +362,110 @@ class Backend(QObject):
     @Property(str, constant=True)
     def version(self):
         return VERSION
+
+    @Property(str, constant=True)
+    def versionText(self):
+        return self._version_text
+
+    # ---- updates: "git pull" from the GitHub repository this folder was cloned from, then restart
+    @Property(str, notify=updateChanged)
+    def updateState(self):
+        """idle, checking, latest, available, installing, restarting or error."""
+        return self._update["state"]
+
+    @Property(str, notify=updateChanged)
+    def updateText(self):
+        update = self._update
+        text = self._strings.get(update["key"], update["key"])
+        for name, value in update["args"].items():
+            text = text.replace("{" + name + "}", str(value))
+        return "\n".join([text] + ["•  " + change for change in update["changes"]]) if text else ""
+
+    @Property(int, notify=updateChanged)
+    def updateCount(self):
+        return int(self._update["args"].get("count", 0))
+
+    def _set_update(self, state, key="", changes=(), **args):
+        def apply():
+            self._update = {"state": state, "key": key, "args": args, "changes": list(changes)}
+            self.updateChanged.emit()
+        self._later(apply)
+
+    def _update_busy(self) -> bool:
+        return self._update["state"] in ("checking", "installing", "restarting")
+
+    @Slot(bool)
+    def checkForUpdates(self, quiet: bool = False):
+        """quiet: the check at start-up, which only speaks up when there is an update."""
+        if self._update_busy():
+            return
+        if not quiet:
+            self._update = {"state": "checking", "key": "upd_checking", "args": {}, "changes": []}
+            self.updateChanged.emit()
+        threading.Thread(target=self._check_updates, args=(quiet,), daemon=True).start()
+
+    def _check_updates(self, quiet: bool):
+        if not shutil.which("git"):
+            problem = ("upd_no_git", {})
+        elif not (APP_DIR / ".git").exists():
+            problem = ("upd_not_repo", {})
+        else:
+            code, _, err = git("fetch", "--quiet", "origin", timeout=120)
+            count = "0"
+            if code == 0:
+                code, count, err = git("rev-list", "--count", "HEAD..@{u}")
+            if code == 0:
+                if int(count or "0") == 0:
+                    return self._set_update("latest", "upd_latest")
+                _, changes, _ = git("log", "--format=%s", "HEAD..@{u}")
+                return self._set_update("available", "upd_available", changes.splitlines()[:12], count=int(count))
+            problem = ("upd_fetch_failed", {"error": short(err)})
+        if quiet:
+            self._set_update("idle")
+        else:
+            self._set_update("error", problem[0], **problem[1])
+
+    @Slot()
+    def installUpdate(self):
+        if self._update_busy():
+            return
+        self._update = {"state": "installing", "key": "upd_installing", "args": {}, "changes": []}
+        self.updateChanged.emit()
+        threading.Thread(target=self._install_update, daemon=True).start()
+
+    def _install_update(self):
+        _, old, _ = git("rev-parse", "HEAD")
+        code, out, err = git("pull", "--ff-only", timeout=300)
+        if code != 0:
+            return self._set_update("error", "upd_pull_failed", error=short(err or out))
+        _, new, _ = git("rev-parse", "HEAD")
+        changed = set(git("diff", "--name-only", old, new)[1].splitlines()) if old and new else set()
+        if "requirements.txt" in changed:
+            python = Path(sys.executable).with_name("python.exe")   # python.exe, not pythonw, for pip
+            code, out, err = run_quiet([python if python.exists() else sys.executable, "-m", "pip", "install",
+                                        "-r", "requirements.txt"], timeout=1800)
+            if code != 0:
+                return self._set_update("error", "upd_pip_failed", error=short(err or out))
+        names = [name for name, (sources, _) in BUILDS.items() if changed & sources]
+        if names:
+            error = rebuild(names)
+            if error:
+                return self._set_update("error", "upd_build_failed", error=error)
+        log(f"updated {old[:7]} -> {new[:7]} ({len(changed)} files)")
+        self._set_update("restarting", "upd_restarting")
+        self._later(self.updateInstalled.emit)
+
+    @Slot(str)
+    def restartApp(self, path: str):
+        """Starts the updated T-Player (with the same video) and closes this one."""
+        self._settings.save_now()
+        exe = APP_DIR / "T-Player.exe"
+        command = [str(exe)] if exe.exists() else [str(Path(sys.executable).with_name("pythonw.exe")),
+                                                   str(APP_DIR / "tplayer.py")]
+        if path:
+            command.append(path)
+        subprocess.Popen(command, cwd=str(APP_DIR))
+        QTimer.singleShot(300, QGuiApplication.instance().quit)
 
     @Property(str, constant=True)
     def mediaPatterns(self):
@@ -414,9 +608,9 @@ class Backend(QObject):
                 log(f"frame not saved: {error}")
                 ok = False
             if ok:
-                self.frameSaved.emit(str(target))
+                self._later(lambda: self.frameSaved.emit(str(target)))
             else:
-                self.frameSaveFailed.emit()
+                self._later(self.frameSaveFailed.emit)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -578,9 +772,9 @@ def apply_palette(app: QGuiApplication) -> None:
     colours = {role.Window: "#1b1c22", role.WindowText: "#f4f4f7", role.Base: "#141519",
                role.AlternateBase: "#22232a", role.ToolTipBase: "#24252d", role.ToolTipText: "#f4f4f7",
                role.Text: "#f4f4f7", role.Button: "#24252d", role.ButtonText: "#f4f4f7", role.BrightText: "#ffffff",
-               role.Highlight: "#ff4f5e", role.HighlightedText: "#ffffff", role.Light: "#3a3b45",
+               role.Highlight: "#0099ff", role.HighlightedText: "#ffffff", role.Light: "#3a3b45",
                role.Midlight: "#30313a", role.Mid: "#2a2b33", role.Dark: "#101114", role.Shadow: "#000000",
-               role.PlaceholderText: "#8a8d99", role.Link: "#ff7a85"}
+               role.PlaceholderText: "#8a8d99", role.Link: "#66c2ff"}
     palette = QPalette()
     for r, colour in colours.items():
         palette.setColor(r, QColor(colour))
@@ -637,6 +831,7 @@ def show_window(win: QWindow, settings: Settings) -> None:
 def build(argv: list[str]):
     """Creates the app and its window. Returns (app, engine, window, backend); keep them alive."""
     start_log()
+    remove_old_builds()
     QGuiApplication.setApplicationName(APP_NAME)
     QGuiApplication.setOrganizationName("T-production")
     QGuiApplication.setApplicationVersion(VERSION)

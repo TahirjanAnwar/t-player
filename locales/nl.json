@@ -65,5 +65,22 @@
   "key_jump": "Naar 0% … 90% springen",
   "key_picture": "Beeld opslaan als afbeelding",
   "key_info": "Video-info",
-  "key_open": "Video openen"
+  "key_open": "Video openen",
+  "check_updates": "Controleren op updates",
+  "updates": "Updates",
+  "update_available": "Update beschikbaar",
+  "install_update": "Update installeren",
+  "check_again": "Opnieuw controleren",
+  "upd_version": "Versie {version}",
+  "upd_checking": "GitHub wordt gecontroleerd…",
+  "upd_latest": "Je hebt de nieuwste versie.",
+  "upd_available": "{count} update(s) beschikbaar:",
+  "upd_installing": "De update wordt geïnstalleerd…",
+  "upd_restarting": "Bijgewerkt. T-Player start opnieuw…",
+  "upd_not_repo": "Updates komen van GitHub, maar deze kopie is niet gekoppeld aan de GitHub-repository. Download T-Player met \"git clone\" om updates te krijgen.",
+  "upd_no_git": "Git is niet geïnstalleerd, dus updates kunnen niet worden gedownload.",
+  "upd_fetch_failed": "GitHub is niet bereikbaar: {error}",
+  "upd_pull_failed": "De update kon niet worden geïnstalleerd: {error}",
+  "upd_pip_failed": "Het installeren van nieuwe pakketten is mislukt: {error}",
+  "upd_build_failed": "Het opnieuw bouwen van de programmabestanden van T-Player is mislukt: {error}"
 }

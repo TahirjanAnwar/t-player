@@ -24,7 +24,7 @@ ApplicationWindow {
     palette.text: "#f4f4f7"
     palette.button: "#24252d"
     palette.buttonText: "#f4f4f7"
-    palette.highlight: "#ff4f5e"
+    palette.highlight: "#0099ff"
     palette.highlightedText: "#ffffff"
     palette.light: "#3a3b45"
     palette.midlight: "#30313a"
@@ -35,7 +35,7 @@ ApplicationWindow {
     palette.toolTipText: "#f4f4f7"
 
     // ------------------------------------------------------------ look
-    readonly property color accent: "#ff4f5e"
+    readonly property color accent: "#0099ff"
     readonly property color ink: "#f4f4f7"
     readonly property color dim: "#a9acb9"
     readonly property string icons: "Segoe MDL2 Assets"
@@ -52,6 +52,8 @@ ApplicationWindow {
     property bool mouseActive: true
     property bool infoOpen: false
     property bool keysOpen: false
+    property bool updatesOpen: false
+    readonly property bool updateBusy: ["checking", "installing", "restarting"].indexOf(backend.updateState) >= 0
     property bool showRemaining: false
     property string errorText: ""
     property real pendingResume: 0
@@ -193,9 +195,15 @@ ApplicationWindow {
         audioNames = backend.trackNames(player, 0)
         subtitleNames = backend.trackNames(player, 1)
     }
+    function openUpdates() {
+        updatesOpen = true
+        if (["available", "installing", "restarting", "checking"].indexOf(backend.updateState) < 0)
+            backend.checkForUpdates(false)
+    }
     function handleKey(e) {
         var ctrl = (e.modifiers & Qt.ControlModifier) !== 0
         if (keysOpen && e.key === Qt.Key_Escape) { keysOpen = false; e.accepted = true; return }
+        if (updatesOpen && e.key === Qt.Key_Escape) { if (!updateBusy) updatesOpen = false; e.accepted = true; return }
         switch (e.key) {
         case Qt.Key_Space: case Qt.Key_K: case Qt.Key_MediaPlay: case Qt.Key_MediaPause:
         case Qt.Key_MediaTogglePlayPause: togglePlay(); break
@@ -240,9 +248,11 @@ ApplicationWindow {
         function onOpenRequested(target) { win.openUrl(target) }
         function onFrameSaved(path) { win.osd(win.tr("frame_saved")) }
         function onFrameSaveFailed() { win.osd(win.tr("frame_failed")) }
+        function onUpdateInstalled() { win.rememberPosition(); backend.restartApp(backend.currentPath) }
     }
 
     Timer { id: idleTimer; interval: 2500; onTriggered: win.mouseActive = false }
+    Timer { interval: 4000; running: true; onTriggered: backend.checkForUpdates(true) }   // a quiet look at GitHub
     Timer { id: osdTimer; interval: 1500; onTriggered: osdBox.opacity = 0 }
     Timer { id: clickTimer; interval: 240; onTriggered: win.togglePlay() }
     Timer { id: infoTimer; interval: 1000; repeat: true; triggeredOnStart: true; running: win.infoOpen && win.hasMedia; onTriggered: win.refreshInfo() }
@@ -418,6 +428,37 @@ ApplicationWindow {
                 }
             }
         }
+
+        // Version, and "Check for updates" (a blue "Update available" button when GitHub has one)
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 18
+            spacing: 14
+            LayoutMirroring.enabled: backend.rtl
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "T-Player " + backend.version
+                color: "#6d707b"; font.pixelSize: 12; font.family: "Segoe UI"
+            }
+            Rectangle {
+                readonly property bool available: backend.updateState === "available"
+                anchors.verticalCenter: parent.verticalCenter
+                width: updateLink.implicitWidth + (available ? 28 : 0)
+                height: 28; radius: 14
+                color: !available ? "transparent" : updateArea.containsMouse ? Qt.lighter(win.accent, 1.12) : win.accent
+                Text {
+                    id: updateLink
+                    anchors.centerIn: parent
+                    text: parent.available ? win.tr("update_available") : win.tr("check_updates")
+                    color: parent.available ? "white" : updateArea.containsMouse ? win.ink : win.dim
+                    font.pixelSize: Math.round(12 * win.fs); font.family: backend.fontFamily
+                    font.weight: parent.available ? Font.DemiBold : Font.Normal
+                    font.underline: !parent.available && updateArea.containsMouse
+                }
+                MouseArea { id: updateArea; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.openUpdates() }
+            }
+        }
     }
 
     // ------------------------------------------------------------ top: file name
@@ -552,6 +593,13 @@ ApplicationWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     glyph: ""; tip: win.tr("more")
                     onClicked: moreMenu.popup(moreButton, moreButton.width - moreMenu.implicitWidth, -moreMenu.implicitHeight - 6)
+                    Rectangle {      // a blue dot when an update is waiting
+                        visible: backend.updateState === "available"
+                        width: 10; height: 10; radius: 5
+                        color: win.accent
+                        border.color: "#000000"; border.width: 1.5
+                        anchors { right: parent.right; top: parent.top; rightMargin: 6; topMargin: 6 }
+                    }
                 }
                 IconButton {
                     anchors.verticalCenter: parent.verticalCenter
@@ -621,7 +669,7 @@ ApplicationWindow {
         height: errorColumn.implicitHeight + 40
         radius: 14
         color: "#f214151b"
-        border.color: "#55ff4f5e"
+        border.color: "#550099ff"
         Column {
             id: errorColumn
             anchors.centerIn: parent
@@ -757,6 +805,89 @@ ApplicationWindow {
         }
     }
 
+    // ------------------------------------------------------------ updates panel
+    Rectangle {
+        anchors.fill: parent
+        visible: win.updatesOpen
+        color: "#99000000"
+        MouseArea { anchors.fill: parent; onClicked: if (!win.updateBusy) win.updatesOpen = false }
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 40, 520)
+            height: updateColumn.implicitHeight + 40
+            radius: 14
+            color: "#f514151b"
+            border.color: "#22ffffff"
+            LayoutMirroring.enabled: backend.rtl
+            LayoutMirroring.childrenInherit: true
+            MouseArea { anchors.fill: parent }
+            Column {
+                id: updateColumn
+                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 20 }
+                spacing: 14
+                Item {
+                    width: parent.width; height: 32
+                    Text {
+                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                        text: win.tr("updates"); color: win.ink
+                        font.pixelSize: Math.round(17 * win.fs); font.weight: Font.DemiBold; font.family: backend.fontFamily
+                    }
+                    IconButton {
+                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        width: 30; height: 30; glyph: ""; glyphSize: 11; tip: win.tr("close")
+                        visible: !win.updateBusy
+                        onClicked: win.updatesOpen = false
+                    }
+                }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignLeft
+                    // the version is wrapped as left-to-right text, so Uyghur and Arabic don't reorder its date
+                    text: win.tr("upd_version", { version: "‪" + backend.versionText + "‬" })
+                    color: win.dim; font.pixelSize: Math.round(13 * win.fs); font.family: backend.fontFamily
+                }
+                Item {
+                    width: parent.width
+                    height: Math.max(updateMessage.implicitHeight, busy.visible ? 28 : 0)
+                    BusyIndicator {
+                        id: busy
+                        anchors.left: parent.left; anchors.top: parent.top
+                        width: 28; height: 28
+                        visible: win.updateBusy
+                        running: visible
+                    }
+                    Text {
+                        id: updateMessage
+                        anchors.left: busy.visible ? busy.right : parent.left
+                        anchors.leftMargin: busy.visible ? 10 : 0
+                        anchors.right: parent.right
+                        anchors.verticalCenter: busy.visible ? busy.verticalCenter : undefined
+                        horizontalAlignment: Text.AlignLeft
+                        text: backend.updateText
+                        color: backend.updateState === "error" ? "#ff8a80" : win.ink
+                        wrapMode: Text.Wrap
+                        lineHeight: 1.15
+                        font.pixelSize: Math.round(14 * win.fs); font.family: backend.fontFamily
+                    }
+                }
+                Row {
+                    spacing: 10
+                    visible: !win.updateBusy
+                    PillButton {
+                        label: win.tr("install_update")
+                        primary: true
+                        visible: backend.updateState === "available"
+                        onClicked: backend.installUpdate()
+                    }
+                    PillButton {
+                        label: win.tr("check_again")
+                        onClicked: backend.checkForUpdates(false)
+                    }
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------ drag and drop
     DropArea {
         id: drop
@@ -773,7 +904,7 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 10
         visible: drop.containsDrag
-        color: "#1aff4f5e"
+        color: "#1a0099ff"
         radius: 16
         border.color: win.accent
         border.width: 3
@@ -885,6 +1016,10 @@ ApplicationWindow {
             }
         }
         MItem { text: win.tr("shortcuts"); onTriggered: win.keysOpen = true }
+        MItem {
+            text: backend.updateState === "available" ? win.tr("update_available") : win.tr("check_updates")
+            onTriggered: win.openUpdates()
+        }
         MenuSeparator {}
         MItem { text: win.tr("open_video"); onTriggered: openDialog.open() }
     }
@@ -934,6 +1069,26 @@ ApplicationWindow {
         ToolTip.text: button.tip
     }
 
+    component PillButton: Rectangle {
+        id: pill
+        property string label: ""
+        property bool primary: false
+        signal clicked()
+        width: pillText.implicitWidth + 40
+        height: 40
+        radius: 20
+        color: primary ? (pillArea.pressed ? "#0080d6" : pillArea.containsMouse ? "#24a8ff" : "#0099ff")
+                       : (pillArea.pressed ? "#40ffffff" : pillArea.containsMouse ? "#2effffff" : "#1fffffff")
+        Text {
+            id: pillText
+            anchors.centerIn: parent
+            text: pill.label
+            color: "#ffffff"
+            font.pixelSize: Math.round(14 * backend.fontScale); font.weight: Font.DemiBold; font.family: backend.fontFamily
+        }
+        MouseArea { id: pillArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: pill.clicked() }
+    }
+
     component SeekBar: Item {
         id: bar
         property real value: 0              // played part, 0..1
@@ -970,12 +1125,12 @@ ApplicationWindow {
             Rectangle {
                 width: Math.max(parent.height, parent.width * bar.shown)
                 height: parent.height; radius: parent.radius
-                color: "#ff4f5e"
+                color: "#0099ff"
             }
         }
         Rectangle {
             width: 14; height: 14; radius: 7
-            color: "#ff4f5e"
+            color: "#0099ff"
             anchors.verticalCenter: parent.verticalCenter
             x: bar.width * bar.shown - width / 2
             visible: bar.hot

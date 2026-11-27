@@ -13,15 +13,37 @@ without Microsoft's paid "HEVC Video Extensions". It plays almost every other fo
 - **Extras:** frame-by-frame stepping, speed 0.25× to 2×, audio track and subtitle choice, video info,
   and saving the frame on screen as a PNG.
 - **Five languages:** English, Uyghur, Turkish, Arabic and Dutch.
+- **Thumbnails.** HEVC videos show a frame as their thumbnail in File Explorer.
+- **Updates.** A *Check for updates* button installs new versions from GitHub.
+
+The icon is the sky blue of the Kök Bayraq, the flag of East Turkistan (#0099FF), with a white play symbol.
 
 ## Install
 
-1. Python 3.12 has to be installed (<https://www.python.org/downloads/>).
-2. Double-click **`setup.cmd`**. It does four things:
+You need Windows 10 or 11, [Python 3.12](https://www.python.org/downloads/) and
+[Git](https://git-scm.com/download/win).
+
+1. Get T-Player with Git, so the update button can update it later:
+
+   ```
+   git clone https://github.com/TahirjanAnwar/t-player.git T-Player
+   ```
+
+   A ZIP download from GitHub works too, but then T-Player can't update itself.
+2. Double-click **`setup.cmd`** in the `T-Player` folder. It does four things:
    - installs Qt for Python into `.venv` (about 350 MB)
-   - builds `T-Player.exe`
+   - builds `T-Player.exe` and the thumbnail add-on
    - puts T-Player on the desktop and in the Start menu
    - asks whether videos should open in T-Player with a double-click
+
+## Updates
+
+T-Player looks for a new version on GitHub a few seconds after it starts. When there is one, the start screen
+shows a blue **Update available** button, and a blue dot appears on `⋯`. You can also check yourself with
+**Check for updates**: at the bottom of the start screen, or in the `⋯` / right-click menu.
+
+**Install update** gets the new version with `git pull`, installs new packages if the update needs them, and
+rebuilds `T-Player.exe` or the thumbnail add-on if they changed. Then T-Player restarts with the same video.
 
 ## Make T-Player your video player
 

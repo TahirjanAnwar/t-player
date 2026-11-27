@@ -65,5 +65,22 @@
   "key_jump": "0% … 90% غا ئاتلاش",
   "key_picture": "كادىرنى رەسىم قىلىپ ساقلاش",
   "key_info": "سىن ئۇچۇرى",
-  "key_open": "سىن ئېچىش"
+  "key_open": "سىن ئېچىش",
+  "check_updates": "يېڭىلانمىنى تەكشۈرۈش",
+  "updates": "يېڭىلانمىلار",
+  "update_available": "يېڭىلانما بار",
+  "install_update": "يېڭىلانمىنى ئورنىتىش",
+  "check_again": "قايتا تەكشۈرۈش",
+  "upd_version": "نەشرى: {version}",
+  "upd_checking": "GitHub تەكشۈرۈلۈۋاتىدۇ…",
+  "upd_latest": "سىز ئەڭ يېڭى نەشرىنى ئىشلىتىۋاتىسىز.",
+  "upd_available": "{count} يېڭىلانما بار:",
+  "upd_installing": "يېڭىلانما ئورنىتىلىۋاتىدۇ…",
+  "upd_restarting": "يېڭىلاندى. T-Player قايتا قوزغىلىۋاتىدۇ…",
+  "upd_not_repo": "يېڭىلانمىلار GitHub تىن كېلىدۇ، ئەمما بۇ نۇسخا GitHub ئامبىرىغا ئۇلانمىغان. يېڭىلانما ئېلىش ئۈچۈن T-Player نى «git clone» بىلەن چۈشۈرۈڭ.",
+  "upd_no_git": "Git ئورنىتىلمىغان، شۇڭا يېڭىلانمىلارنى چۈشۈرگىلى بولمايدۇ.",
+  "upd_fetch_failed": "GitHub قا ئۇلانغىلى بولمىدى: {error}",
+  "upd_pull_failed": "يېڭىلانمىنى ئورناتقىلى بولمىدى: {error}",
+  "upd_pip_failed": "يېڭى بوغچىلارنى ئورنىتىش مەغلۇپ بولدى: {error}",
+  "upd_build_failed": "T-Player پروگرامما ھۆججەتلىرىنى قايتا ياساش مەغلۇپ بولدى: {error}"
 }

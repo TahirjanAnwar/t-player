@@ -6,7 +6,8 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 SIZE = 1024                      # drawn large, then shrunk, for smooth edges
-TOP, BOTTOM = (255, 112, 84), (230, 36, 98)   # coral to raspberry (Voice Clone's icon is the violet sibling)
+# The sky blue of East Turkistan's flag, the Kok Bayraq (#0099FF), with a white symbol like its crescent and star.
+TOP = BOTTOM = (0, 153, 255)
 
 
 def gradient(size):

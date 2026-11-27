@@ -65,5 +65,22 @@
   "key_jump": "Jump to 0% … 90%",
   "key_picture": "Save frame as picture",
   "key_info": "Video info",
-  "key_open": "Open video"
+  "key_open": "Open video",
+  "check_updates": "Check for updates",
+  "updates": "Updates",
+  "update_available": "Update available",
+  "install_update": "Install update",
+  "check_again": "Check again",
+  "upd_version": "Version {version}",
+  "upd_checking": "Checking GitHub…",
+  "upd_latest": "You have the latest version.",
+  "upd_available": "{count} update(s) available:",
+  "upd_installing": "Installing the update…",
+  "upd_restarting": "Updated. T-Player is restarting…",
+  "upd_not_repo": "Updates come from GitHub, but this copy isn't connected to the GitHub repository. Download T-Player with \"git clone\" to get updates.",
+  "upd_no_git": "Git isn't installed, so updates can't be downloaded.",
+  "upd_fetch_failed": "Couldn't reach GitHub: {error}",
+  "upd_pull_failed": "The update couldn't be installed: {error}",
+  "upd_pip_failed": "Installing new packages failed: {error}",
+  "upd_build_failed": "Rebuilding T-Player's program files failed: {error}"
 }

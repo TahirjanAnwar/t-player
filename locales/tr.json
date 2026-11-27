@@ -65,5 +65,22 @@
   "key_jump": "%0 … %90 noktasına atla",
   "key_picture": "Kareyi resim olarak kaydet",
   "key_info": "Video bilgisi",
-  "key_open": "Video aç"
+  "key_open": "Video aç",
+  "check_updates": "Güncellemeleri denetle",
+  "updates": "Güncellemeler",
+  "update_available": "Güncelleme var",
+  "install_update": "Güncellemeyi yükle",
+  "check_again": "Yeniden denetle",
+  "upd_version": "Sürüm {version}",
+  "upd_checking": "GitHub denetleniyor…",
+  "upd_latest": "En son sürümü kullanıyorsunuz.",
+  "upd_available": "{count} güncelleme mevcut:",
+  "upd_installing": "Güncelleme yükleniyor…",
+  "upd_restarting": "Güncellendi. T-Player yeniden başlatılıyor…",
+  "upd_not_repo": "Güncellemeler GitHub'dan gelir, ancak bu kopya GitHub deposuna bağlı değil. Güncelleme almak için T-Player'ı \"git clone\" ile indirin.",
+  "upd_no_git": "Git yüklü değil, bu yüzden güncellemeler indirilemiyor.",
+  "upd_fetch_failed": "GitHub'a ulaşılamadı: {error}",
+  "upd_pull_failed": "Güncelleme yüklenemedi: {error}",
+  "upd_pip_failed": "Yeni paketler yüklenemedi: {error}",
+  "upd_build_failed": "T-Player program dosyaları yeniden oluşturulamadı: {error}"
 }

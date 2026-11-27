@@ -65,5 +65,22 @@
   "key_jump": "الانتقال إلى 0% … 90%",
   "key_picture": "حفظ اللقطة كصورة",
   "key_info": "معلومات الفيديو",
-  "key_open": "فتح فيديو"
+  "key_open": "فتح فيديو",
+  "check_updates": "البحث عن تحديثات",
+  "updates": "التحديثات",
+  "update_available": "يتوفر تحديث",
+  "install_update": "تثبيت التحديث",
+  "check_again": "البحث مرة أخرى",
+  "upd_version": "الإصدار {version}",
+  "upd_checking": "جارٍ التحقق من GitHub…",
+  "upd_latest": "لديك أحدث إصدار.",
+  "upd_available": "تتوفر تحديثات ({count}):",
+  "upd_installing": "جارٍ تثبيت التحديث…",
+  "upd_restarting": "تم التحديث. تتم إعادة تشغيل T-Player…",
+  "upd_not_repo": "تأتي التحديثات من GitHub، لكن هذه النسخة غير مرتبطة بمستودع GitHub. نزّل T-Player باستخدام \"git clone\" للحصول على التحديثات.",
+  "upd_no_git": "برنامج Git غير مثبّت، لذلك لا يمكن تنزيل التحديثات.",
+  "upd_fetch_failed": "تعذّر الوصول إلى GitHub: {error}",
+  "upd_pull_failed": "تعذّر تثبيت التحديث: {error}",
+  "upd_pip_failed": "فشل تثبيت الحزم الجديدة: {error}",
+  "upd_build_failed": "تعذّرت إعادة بناء ملفات برنامج T-Player: {error}"
 }
